@@ -6,11 +6,11 @@ linters:
     - ineffassign
     - staticcheck
     - unused
-    - gofmt
     - goimports
     - misspell
     - bodyclose
     - noctx
+    - revive
 
 linters-settings:
   goimports:
