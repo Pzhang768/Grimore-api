@@ -1,7 +1,7 @@
 package config
 
 import (
-	"os"
+	"strings"
 	"testing"
 )
 
@@ -12,21 +12,10 @@ var allVars = map[string]string{
 	"SUPABASE_SERVICE_ROLE_KEY": "test-role-key",
 }
 
-func setEnv(vars map[string]string) {
-	for k, v := range vars {
-		os.Setenv(k, v)
-	}
-}
-
-func unsetEnv(vars map[string]string) {
-	for k := range vars {
-		os.Unsetenv(k)
-	}
-}
-
 func TestLoad_Success(t *testing.T) {
-	setEnv(allVars)
-	defer unsetEnv(allVars)
+	for k, v := range allVars {
+		t.Setenv(k, v)
+	}
 
 	cfg, err := Load()
 	if err != nil {
@@ -46,6 +35,26 @@ func TestLoad_Success(t *testing.T) {
 	}
 }
 
+func TestLoad_OptionalFieldsEmpty(t *testing.T) {
+	for k, v := range allVars {
+		t.Setenv(k, v)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.AnthropicAPIKey != "" {
+		t.Errorf("expected AnthropicAPIKey empty, got %s", cfg.AnthropicAPIKey)
+	}
+	if cfg.StripeSecretKey != "" {
+		t.Errorf("expected StripeSecretKey empty, got %s", cfg.StripeSecretKey)
+	}
+	if cfg.StripePriceID != "" {
+		t.Errorf("expected StripePriceID empty, got %s", cfg.StripePriceID)
+	}
+}
+
 func TestLoad_MissingVar(t *testing.T) {
 	required := []string{
 		"PORT",
@@ -56,14 +65,33 @@ func TestLoad_MissingVar(t *testing.T) {
 
 	for _, missing := range required {
 		t.Run(missing, func(t *testing.T) {
-			setEnv(allVars)
-			defer unsetEnv(allVars)
-			os.Unsetenv(missing)
+			for k, v := range allVars {
+				t.Setenv(k, v)
+			}
+			t.Setenv(missing, "")
 
 			_, err := Load()
 			if err == nil {
 				t.Fatalf("expected error for missing %s, got nil", missing)
 			}
+			if !strings.Contains(err.Error(), missing) {
+				t.Errorf("expected error to mention %q, got: %v", missing, err)
+			}
 		})
+	}
+}
+
+func TestLoad_InvalidPort(t *testing.T) {
+	for k, v := range allVars {
+		t.Setenv(k, v)
+	}
+	t.Setenv("PORT", "notaport")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected error for invalid PORT, got nil")
+	}
+	if !strings.Contains(err.Error(), "PORT") {
+		t.Errorf("expected error to mention PORT, got: %v", err)
 	}
 }
