@@ -1,0 +1,1 @@
+HTTP layer only. Handlers parse requests, call services, and write responses. No business logic, no direct DB access.

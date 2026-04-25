@@ -1,0 +1,1 @@
+Reusable SSE streaming utilities: writer, event types, flush helpers. Used by run handlers to stream agent tokens to the frontend.

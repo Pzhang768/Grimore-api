@@ -1,0 +1,1 @@
+GORM structs for all database tables: User, Team, TeamAgent, Run, RunEvent, Deliverable.

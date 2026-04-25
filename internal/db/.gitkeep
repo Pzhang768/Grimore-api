@@ -1,0 +1,1 @@
+Database queries. All GORM interactions live here. Services call into db — never handlers or agents directly.
