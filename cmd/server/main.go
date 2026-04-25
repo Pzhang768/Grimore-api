@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log/slog"
 	"os"
 
@@ -12,9 +13,15 @@ import (
 )
 
 func main() {
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+	level := slog.LevelInfo
+	if os.Getenv("LOG_LEVEL") == "debug" {
+		level = slog.LevelDebug
+	}
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})))
 
-	_ = godotenv.Load(".env.local")
+	if err := godotenv.Load(".env.local"); err != nil && !errors.Is(err, os.ErrNotExist) {
+		slog.Warn("failed to load .env.local", "error", err)
+	}
 
 	cfg, err := config.Load()
 	if err != nil {
