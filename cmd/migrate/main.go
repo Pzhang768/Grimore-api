@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log/slog"
 	"os"
 
@@ -15,7 +16,9 @@ import (
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
-	_ = godotenv.Load(".env.local")
+	if err := godotenv.Load(".env.local"); err != nil && !errors.Is(err, os.ErrNotExist) {
+		slog.Warn("failed to load .env.local", "error", err)
+	}
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -31,6 +34,7 @@ func main() {
 
 	slog.Info("running migrations")
 
+	// AutoMigrate only adds columns and indexes; destructive changes require manual migration.
 	if err := db.AutoMigrate(
 		&models.User{},
 		&models.Team{},
