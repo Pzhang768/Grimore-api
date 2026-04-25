@@ -3,6 +3,7 @@
   entrypoint = "./tmp/server.exe"
   include_ext = ["go"]
   exclude_dir = ["tmp", "vendor"]
+  exclude_file = [".env", ".env.local"]
   delay = 500
 
 [log]
