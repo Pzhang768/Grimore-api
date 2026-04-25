@@ -1,3 +1,5 @@
+.PHONY: run test lint vet fmt build tidy
+
 run:
 	air
 
@@ -12,6 +14,9 @@ vet:
 
 fmt:
 	gofmt -w .
+
+tidy:
+	go mod tidy
 
 build:
 	go build -o ./tmp/server.exe ./cmd/server
