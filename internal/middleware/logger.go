@@ -11,11 +11,18 @@ func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
-		slog.Info("request",
+
+		fields := []any{
 			"method", c.Request.Method,
 			"path", c.Request.URL.Path,
 			"status", c.Writer.Status(),
 			"duration", time.Since(start),
-		)
+		}
+
+		if len(c.Errors) > 0 {
+			slog.Error("request", append(fields, "errors", c.Errors.String())...)
+		} else {
+			slog.Info("request", fields...)
+		}
 	}
 }
