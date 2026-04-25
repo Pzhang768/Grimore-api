@@ -1,0 +1,1 @@
+AI provider interface (Complete, Stream), Claude Haiku 4.5 implementation, and the Coordinator that orchestrates the agent pipeline. This is the AI end — it owns the execution order, context passing between agents, and checkpoint signalling.

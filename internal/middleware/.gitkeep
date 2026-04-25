@@ -1,0 +1,1 @@
+Gin middleware: Supabase JWT auth, logging, rate limiting. Registered on the router before route handlers.

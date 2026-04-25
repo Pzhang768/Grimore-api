@@ -1,0 +1,27 @@
+# Compiled binaries and build output
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/server
+/tmp
+
+# Go test artifacts
+*.test
+*.out
+
+# Dependency cache
+vendor/
+
+# Environment variables — copy .env.example to set up locally
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

@@ -14,8 +14,8 @@ cmd/
 internal/
 ├── handlers/              # Gin route handlers (HTTP layer only)
 ├── services/              # Business logic
-├── agents/                # Agent logic (fetcher, analyser, tailor, coordinator)
-├── ai/                    # Claude provider interface + implementation
+├── agents/                # Individual agent implementations (fetcher, analyser, tailor)
+├── ai/                    # Claude provider interface, implementation, and Coordinator (pipeline orchestration)
 ├── db/                    # Database connection and queries
 ├── models/                # GORM structs
 └── middleware/            # JWT auth, logging, rate limiting
@@ -56,7 +56,8 @@ STRIPE_PRICE_ID=
 JobListingFetcher → FitAnalyser → ResumeTailoringAgent → checkpoint (max 3 iterations)
 ```
 
-Agents call `ai.Provider` via constructor injection — never import the Anthropic SDK directly.
+Individual agents (fetcher, analyser, tailor) call `ai.Provider` via constructor injection — never import the Anthropic SDK directly.
+The Coordinator in `ai/` owns execution order, context passing between agents, and checkpoint signalling.
 SSE events stream to the frontend via `pkg/sse`.
 
 ## Database Schema (Key Tables)
