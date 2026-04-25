@@ -21,6 +21,8 @@ func ErrorHandler() gin.HandlerFunc {
 			}
 		}
 
+		// The last attached error determines the response type and status.
+		// Attach errors in order of priority: the most important error last.
 		err := c.Errors.Last()
 		switch err.Type {
 		case gin.ErrorTypePublic:

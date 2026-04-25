@@ -20,6 +20,7 @@ func Logger() gin.HandlerFunc {
 		}
 
 		if len(c.Errors) > 0 {
+			// append extends the base fields slice with the errors key-value pair
 			slog.Error("request", append(fields, "errors", c.Errors.String())...)
 		} else {
 			slog.Info("request", fields...)
