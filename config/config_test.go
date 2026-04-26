@@ -10,6 +10,7 @@ var allVars = map[string]string{
 	"DATABASE_URL":              "postgres://localhost/test",
 	"SUPABASE_URL":              "https://test.supabase.co",
 	"SUPABASE_SERVICE_ROLE_KEY": "test-role-key",
+	"SUPABASE_JWT_SECRET":       "test-jwt-secret",
 }
 
 func TestLoad_Success(t *testing.T) {
@@ -61,6 +62,7 @@ func TestLoad_MissingVar(t *testing.T) {
 		"DATABASE_URL",
 		"SUPABASE_URL",
 		"SUPABASE_SERVICE_ROLE_KEY",
+		"SUPABASE_JWT_SECRET",
 	}
 
 	for _, missing := range required {

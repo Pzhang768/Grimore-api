@@ -7,6 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
 	"github.com/Pzhang768/Grimore-api/config"
 	"github.com/Pzhang768/Grimore-api/internal/middleware"
@@ -29,6 +31,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	db, err := gorm.Open(postgres.Open(cfg.DatabaseURL), &gorm.Config{})
+	if err != nil {
+		slog.Error("failed to connect to database", "error", err)
+		os.Exit(1)
+	}
+
 	r := gin.New()
 	r.Use(middleware.Logger())
 	r.Use(gin.Recovery())
@@ -37,6 +45,9 @@ func main() {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
+
+	protected := r.Group("/")
+	protected.Use(middleware.Auth(cfg.SupabaseJWTSecret, db))
 
 	slog.Info("server starting", "port", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
