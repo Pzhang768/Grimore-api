@@ -12,7 +12,8 @@ cmd/
     └── main.go            # Entry point
 
 internal/
-├── handlers/              # Gin route handlers (HTTP layer only)
+├── server/                # Gin engine setup, middleware wiring, route registration
+├── handlers/              # Gin route handlers (HTTP layer only); each handler has a Register(r gin.IRouter) method
 ├── services/              # Business logic
 ├── agents/                # Individual agent implementations (fetcher, analyser, tailor)
 ├── ai/                    # Claude provider interface, implementation, and Coordinator (pipeline orchestration)
