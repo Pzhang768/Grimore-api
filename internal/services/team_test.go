@@ -93,6 +93,121 @@ func TestListTeams_DBError(t *testing.T) {
 	}
 }
 
+func TestGetTeam_NotFound(t *testing.T) {
+	db, mock := newMockDB(t)
+	svc := NewTeamService(db)
+	teamID := uuid.New()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "teams"`)).
+		WithArgs(teamID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "name", "created_at"}))
+
+	_, _, err := svc.GetTeam(context.Background(), uuid.New(), teamID)
+	if !errors.Is(err, ErrTeamNotFound) {
+		t.Errorf("expected ErrTeamNotFound, got %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestGetTeam_Forbidden(t *testing.T) {
+	db, mock := newMockDB(t)
+	svc := NewTeamService(db)
+	teamID := uuid.New()
+	ownerID := uuid.New()
+	callerID := uuid.New()
+	now := time.Now()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "teams"`)).
+		WithArgs(teamID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "name", "created_at"}).
+			AddRow(teamID, ownerID, "team", now))
+
+	_, _, err := svc.GetTeam(context.Background(), callerID, teamID)
+	if !errors.Is(err, ErrTeamForbidden) {
+		t.Errorf("expected ErrTeamForbidden, got %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestGetTeam_DBError(t *testing.T) {
+	db, mock := newMockDB(t)
+	svc := NewTeamService(db)
+	teamID := uuid.New()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "teams"`)).
+		WithArgs(teamID, 1).
+		WillReturnError(errors.New("db error"))
+
+	_, _, err := svc.GetTeam(context.Background(), uuid.New(), teamID)
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestGetTeam_Success(t *testing.T) {
+	db, mock := newMockDB(t)
+	svc := NewTeamService(db)
+	teamID := uuid.New()
+	userID := uuid.New()
+	now := time.Now()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "teams"`)).
+		WithArgs(teamID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "name", "created_at"}).
+			AddRow(teamID, userID, "my team", now))
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "team_agents"`)).
+		WithArgs(teamID).
+		WillReturnRows(sqlmock.NewRows([]string{"team_id", "agent_type", "position", "context"}).
+			AddRow(teamID, "fetcher", 0, "{}"))
+
+	team, agents, err := svc.GetTeam(context.Background(), userID, teamID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if team.ID != teamID {
+		t.Errorf("expected team ID %s, got %s", teamID, team.ID)
+	}
+	if len(agents) != 1 || agents[0].AgentType != "fetcher" {
+		t.Errorf("unexpected agents: %+v", agents)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestGetTeam_AgentsDBError(t *testing.T) {
+	db, mock := newMockDB(t)
+	svc := NewTeamService(db)
+	teamID := uuid.New()
+	userID := uuid.New()
+	now := time.Now()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "teams"`)).
+		WithArgs(teamID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "name", "created_at"}).
+			AddRow(teamID, userID, "my team", now))
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "team_agents"`)).
+		WithArgs(teamID).
+		WillReturnError(errors.New("db error"))
+
+	_, _, err := svc.GetTeam(context.Background(), userID, teamID)
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
 var baseAgents = []CreateAgentInput{
 	{AgentType: "fetcher", Position: 0},
 }

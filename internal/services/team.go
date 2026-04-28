@@ -25,6 +25,8 @@ var (
 	ErrInvalidAgentType   = errors.New("invalid agent type")
 	ErrDuplicatePosition  = errors.New("agent positions must be unique")
 	ErrDuplicateAgentType = errors.New("each agent type may appear at most once per team")
+	ErrTeamNotFound       = errors.New("team not found")
+	ErrTeamForbidden      = errors.New("team belongs to another user")
 )
 
 type CreateAgentInput struct {
@@ -39,6 +41,24 @@ type TeamService struct {
 
 func NewTeamService(db *gorm.DB) *TeamService {
 	return &TeamService{db: db}
+}
+
+func (s *TeamService) GetTeam(ctx context.Context, userID, teamID uuid.UUID) (*models.Team, []models.TeamAgent, error) {
+	var team models.Team
+	if err := s.db.WithContext(ctx).First(&team, "id = ?", teamID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, ErrTeamNotFound
+		}
+		return nil, nil, err
+	}
+	if team.UserID != userID {
+		return nil, nil, ErrTeamForbidden
+	}
+	var agents []models.TeamAgent
+	if err := s.db.WithContext(ctx).Where("team_id = ?", teamID).Find(&agents).Error; err != nil {
+		return nil, nil, err
+	}
+	return &team, agents, nil
 }
 
 func (s *TeamService) ListTeams(ctx context.Context, userID uuid.UUID) ([]models.Team, error) {
