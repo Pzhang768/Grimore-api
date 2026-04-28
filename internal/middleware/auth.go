@@ -1,7 +1,11 @@
 package middleware
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"encoding/base64"
 	"errors"
+	"math/big"
 	"net/http"
 	"strings"
 
@@ -21,8 +25,26 @@ type supabaseClaims struct {
 	Email string `json:"email"`
 }
 
+// decodeBase64URL decodes a base64url-encoded big integer (used for EC key coordinates).
+func decodeBase64URL(s string) (*big.Int, error) {
+	b, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		return nil, err
+	}
+	return new(big.Int).SetBytes(b), nil
+}
+
 func Auth(jwtSecret string, db *gorm.DB) gin.HandlerFunc {
-	secret := []byte(jwtSecret)
+	hmacSecret := []byte(jwtSecret)
+
+	// P-256 public key from Supabase JWKS — used for ES256 tokens.
+	// x and y are the base64url-encoded coordinates from /auth/v1/.well-known/jwks.json.
+	const jwksX = "r3UIJ8pYajMUDPh1DgvvoRO77-654ECdy4Gzm0qVGuc"
+	const jwksY = "EB6ZVt3gJx9WJhoMSqDPqyBU9a6yTU3JS_q4yo8qazg"
+
+	x, _ := decodeBase64URL(jwksX)
+	y, _ := decodeBase64URL(jwksY)
+	ecKey := &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}
 
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
@@ -35,10 +57,14 @@ func Auth(jwtSecret string, db *gorm.DB) gin.HandlerFunc {
 
 		claims := &supabaseClaims{}
 		token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			switch t.Method.(type) {
+			case *jwt.SigningMethodHMAC:
+				return hmacSecret, nil
+			case *jwt.SigningMethodECDSA:
+				return ecKey, nil
+			default:
 				return nil, errors.New("unexpected signing method")
 			}
-			return secret, nil
 		})
 		if err != nil || !token.Valid {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
