@@ -5,13 +5,12 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
 	"github.com/Pzhang768/Grimore-api/config"
-	"github.com/Pzhang768/Grimore-api/internal/middleware"
+	"github.com/Pzhang768/Grimore-api/internal/server"
 )
 
 func main() {
@@ -37,17 +36,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	r := gin.New()
-	r.Use(middleware.Logger())
-	r.Use(gin.Recovery())
-	r.Use(middleware.ErrorHandler())
-
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
-
-	protected := r.Group("/")
-	protected.Use(middleware.Auth(cfg.SupabaseJWTSecret, db))
+	r := server.New(cfg.SupabaseJWTSecret, db)
 
 	slog.Info("server starting", "port", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
