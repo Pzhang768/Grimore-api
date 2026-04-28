@@ -47,6 +47,7 @@ type listTeamItem struct {
 type teamService interface {
 	CreateTeam(ctx context.Context, userID uuid.UUID, name string, agents []services.CreateAgentInput) (*models.Team, []models.TeamAgent, error)
 	ListTeams(ctx context.Context, userID uuid.UUID) ([]models.Team, error)
+	GetTeam(ctx context.Context, userID, teamID uuid.UUID) (*models.Team, []models.TeamAgent, error)
 }
 
 type TeamHandler struct {
@@ -60,6 +61,47 @@ func NewTeamHandler(svc *services.TeamService) *TeamHandler {
 func (h *TeamHandler) Register(r gin.IRouter) {
 	r.GET("/teams", h.ListTeams)
 	r.POST("/teams", h.CreateTeam)
+	r.GET("/teams/:id", h.GetTeam)
+}
+
+func (h *TeamHandler) GetTeam(c *gin.Context) {
+	teamID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.Error(&gin.Error{Err: errors.New("invalid team id"), Type: gin.ErrorTypePublic}) //nolint:errcheck
+		return
+	}
+
+	// Auth middleware always sets ContextKeyUserID before this handler is reached.
+	userID, _ := c.Get(middleware.ContextKeyUserID)
+
+	team, agents, err := h.svc.GetTeam(c.Request.Context(), userID.(uuid.UUID), teamID)
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrTeamNotFound):
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		case errors.Is(err, services.ErrTeamForbidden):
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		default:
+			c.Error(err) //nolint:errcheck
+		}
+		return
+	}
+
+	resp := createTeamResponse{
+		ID:        team.ID,
+		Name:      team.Name,
+		CreatedAt: team.CreatedAt,
+		Agents:    make([]agentResponse, len(agents)),
+	}
+	for i, a := range agents {
+		resp.Agents[i] = agentResponse{
+			AgentType: a.AgentType,
+			Position:  a.Position,
+			Context:   a.Context,
+		}
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *TeamHandler) ListTeams(c *gin.Context) {

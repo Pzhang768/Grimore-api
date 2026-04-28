@@ -28,6 +28,7 @@ type fakeTeamService struct {
 	teams     []models.Team
 	createErr error
 	listErr   error
+	getErr    error
 }
 
 func (f *fakeTeamService) CreateTeam(_ context.Context, _ uuid.UUID, _ string, _ []services.CreateAgentInput) (*models.Team, []models.TeamAgent, error) {
@@ -36,6 +37,10 @@ func (f *fakeTeamService) CreateTeam(_ context.Context, _ uuid.UUID, _ string, _
 
 func (f *fakeTeamService) ListTeams(_ context.Context, _ uuid.UUID) ([]models.Team, error) {
 	return f.teams, f.listErr
+}
+
+func (f *fakeTeamService) GetTeam(_ context.Context, _ uuid.UUID, _ uuid.UUID) (*models.Team, []models.TeamAgent, error) {
+	return f.team, f.agents, f.getErr
 }
 
 func newTeamRouter(fake teamService, userID uuid.UUID) *gin.Engine {
@@ -80,15 +85,15 @@ func TestRegister(t *testing.T) {
 	r := gin.New()
 	h.Register(r)
 	routes := r.Routes()
-	if len(routes) != 2 {
-		t.Fatalf("expected 2 routes, got %d", len(routes))
+	if len(routes) != 3 {
+		t.Fatalf("expected 3 routes, got %d", len(routes))
 	}
-	methods := map[string]bool{}
+	paths := map[string]bool{}
 	for _, route := range routes {
-		methods[route.Method] = true
+		paths[route.Method+route.Path] = true
 	}
-	if !methods[http.MethodGet] || !methods[http.MethodPost] {
-		t.Errorf("expected GET and POST routes, got %+v", routes)
+	if !paths["GET/teams"] || !paths["POST/teams"] || !paths["GET/teams/:id"] {
+		t.Errorf("unexpected routes: %+v", routes)
 	}
 }
 
@@ -250,6 +255,81 @@ func TestCreateTeamHandler_Success(t *testing.T) {
 	}
 	if resp.Name != "dream team" {
 		t.Errorf("expected name %q, got %q", "dream team", resp.Name)
+	}
+	if len(resp.Agents) != 1 || resp.Agents[0].AgentType != "fetcher" {
+		t.Errorf("unexpected agents: %+v", resp.Agents)
+	}
+}
+
+// --- GetTeam ---
+
+func getTeamByID(r *gin.Engine, id string) *httptest.ResponseRecorder {
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/teams/"+id, nil)
+	r.ServeHTTP(w, req)
+	return w
+}
+
+func TestGetTeamHandler_InvalidID(t *testing.T) {
+	r := newTeamRouter(&fakeTeamService{}, uuid.New())
+	w := getTeamByID(r, "not-a-uuid")
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestGetTeamHandler_NotFound(t *testing.T) {
+	r := newTeamRouter(&fakeTeamService{getErr: services.ErrTeamNotFound}, uuid.New())
+	w := getTeamByID(r, uuid.New().String())
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestGetTeamHandler_Forbidden(t *testing.T) {
+	r := newTeamRouter(&fakeTeamService{getErr: services.ErrTeamForbidden}, uuid.New())
+	w := getTeamByID(r, uuid.New().String())
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d", w.Code)
+	}
+}
+
+func TestGetTeamHandler_InternalError(t *testing.T) {
+	r := newTeamRouter(&fakeTeamService{getErr: errors.New("db error")}, uuid.New())
+	w := getTeamByID(r, uuid.New().String())
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500, got %d", w.Code)
+	}
+}
+
+func TestGetTeamHandler_Success(t *testing.T) {
+	teamID := uuid.New()
+	userID := uuid.New()
+	now := time.Now()
+
+	fake := &fakeTeamService{
+		team: &models.Team{ID: teamID, UserID: userID, Name: "my team", CreatedAt: now},
+		agents: []models.TeamAgent{
+			{TeamID: teamID, AgentType: "fetcher", Position: 0, Context: map[string]any{}},
+		},
+	}
+	r := newTeamRouter(fake, userID)
+	w := getTeamByID(r, teamID.String())
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+
+	var resp createTeamResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.ID != teamID {
+		t.Errorf("expected team ID %s, got %s", teamID, resp.ID)
 	}
 	if len(resp.Agents) != 1 || resp.Agents[0].AgentType != "fetcher" {
 		t.Errorf("unexpected agents: %+v", resp.Agents)
