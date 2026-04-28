@@ -38,12 +38,19 @@ type createTeamResponse struct {
 	CreatedAt time.Time       `json:"created_at"`
 }
 
-type teamCreator interface {
+type listTeamItem struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type teamService interface {
 	CreateTeam(ctx context.Context, userID uuid.UUID, name string, agents []services.CreateAgentInput) (*models.Team, []models.TeamAgent, error)
+	ListTeams(ctx context.Context, userID uuid.UUID) ([]models.Team, error)
 }
 
 type TeamHandler struct {
-	svc teamCreator
+	svc teamService
 }
 
 func NewTeamHandler(svc *services.TeamService) *TeamHandler {
@@ -51,7 +58,30 @@ func NewTeamHandler(svc *services.TeamService) *TeamHandler {
 }
 
 func (h *TeamHandler) Register(r gin.IRouter) {
+	r.GET("/teams", h.ListTeams)
 	r.POST("/teams", h.CreateTeam)
+}
+
+func (h *TeamHandler) ListTeams(c *gin.Context) {
+	// Auth middleware always sets ContextKeyUserID before this handler is reached.
+	userID, _ := c.Get(middleware.ContextKeyUserID)
+
+	teams, err := h.svc.ListTeams(c.Request.Context(), userID.(uuid.UUID))
+	if err != nil {
+		c.Error(err) //nolint:errcheck
+		return
+	}
+
+	resp := make([]listTeamItem, len(teams))
+	for i, t := range teams {
+		resp[i] = listTeamItem{
+			ID:        t.ID,
+			Name:      t.Name,
+			CreatedAt: t.CreatedAt,
+		}
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *TeamHandler) CreateTeam(c *gin.Context) {
