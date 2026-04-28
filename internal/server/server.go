@@ -18,6 +18,7 @@ func New(jwtSecret string, db *gorm.DB) *gin.Engine {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
+	handlers.NewAgentHandler().Register(r)
 
 	protected := r.Group("/")
 	protected.Use(middleware.Auth(jwtSecret, db))
