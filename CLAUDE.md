@@ -57,6 +57,8 @@ STRIPE_PRICE_ID=
 JobListingFetcher → FitAnalyser → ResumeTailoringAgent → checkpoint (max 3 iterations)
 ```
 
+The pipeline order is **fixed in code** — the Coordinator always runs fetcher → analyser → tailor regardless of the `position` value stored in `team_agents`. `position` is persisted but not read at runtime in MVP; do not build logic that depends on it until the pipeline becomes configurable.
+
 Individual agents (fetcher, analyser, tailor) call `ai.Provider` via constructor injection — never import the Anthropic SDK directly.
 The Coordinator in `ai/` owns execution order, context passing between agents, and checkpoint signalling.
 SSE events stream to the frontend via `pkg/sse`.
@@ -65,7 +67,7 @@ SSE events stream to the frontend via `pkg/sse`.
 
 - **users** — id, email, created_at
 - **teams** — id, user_id, name, created_at
-- **team_agents** — team_id, agent_type, context (JSON), position
+- **team_agents** — team_id, agent_type, context (JSON), position (stored but unused in MVP — pipeline order is fixed)
 - **runs** — id, team_id, status, iteration, created_at
 - **run_events** — id, run_id, agent_type, event_type, content, created_at
 - **deliverables** — id, run_id, type, content (JSON), created_at
