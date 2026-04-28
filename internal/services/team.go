@@ -41,6 +41,14 @@ func NewTeamService(db *gorm.DB) *TeamService {
 	return &TeamService{db: db}
 }
 
+func (s *TeamService) ListTeams(ctx context.Context, userID uuid.UUID) ([]models.Team, error) {
+	var teams []models.Team
+	if err := s.db.WithContext(ctx).Where("user_id = ?", userID).Order("created_at DESC").Find(&teams).Error; err != nil {
+		return nil, err
+	}
+	return teams, nil
+}
+
 func (s *TeamService) CreateTeam(ctx context.Context, userID uuid.UUID, name string, agents []CreateAgentInput) (*models.Team, []models.TeamAgent, error) {
 	if name == "" {
 		return nil, nil, ErrTeamNameRequired

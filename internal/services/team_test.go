@@ -5,6 +5,7 @@ import (
 	"errors"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
@@ -23,6 +24,73 @@ func newMockDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
 		t.Fatalf("failed to open gorm db: %v", err)
 	}
 	return db, mock
+}
+
+func TestListTeams_Success(t *testing.T) {
+	db, mock := newMockDB(t)
+	svc := NewTeamService(db)
+	userID := uuid.New()
+	teamID := uuid.New()
+	now := time.Now()
+
+	rows := sqlmock.NewRows([]string{"id", "user_id", "name", "created_at"}).
+		AddRow(teamID, userID, "team one", now).
+		AddRow(uuid.New(), userID, "team two", now)
+
+	mock.ExpectQuery(`SELECT \* FROM "teams" WHERE user_id`).
+		WithArgs(userID).
+		WillReturnRows(rows)
+
+	teams, err := svc.ListTeams(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(teams) != 2 {
+		t.Errorf("expected 2 teams, got %d", len(teams))
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestListTeams_Empty(t *testing.T) {
+	db, mock := newMockDB(t)
+	svc := NewTeamService(db)
+	userID := uuid.New()
+
+	rows := sqlmock.NewRows([]string{"id", "user_id", "name", "created_at"})
+	mock.ExpectQuery(`SELECT \* FROM "teams" WHERE user_id`).
+		WithArgs(userID).
+		WillReturnRows(rows)
+
+	teams, err := svc.ListTeams(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if teams == nil || len(teams) != 0 {
+		t.Errorf("expected empty slice, got %d", len(teams))
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestListTeams_DBError(t *testing.T) {
+	db, mock := newMockDB(t)
+	svc := NewTeamService(db)
+	userID := uuid.New()
+
+	mock.ExpectQuery(`SELECT \* FROM "teams" WHERE user_id`).
+		WithArgs(userID).
+		WillReturnError(errors.New("db error"))
+
+	_, err := svc.ListTeams(context.Background(), userID)
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
 }
 
 var baseAgents = []CreateAgentInput{
